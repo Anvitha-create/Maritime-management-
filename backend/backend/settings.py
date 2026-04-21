@@ -1,21 +1,12 @@
 from pathlib import Path
 from datetime import timedelta
 
-# -------------------------
-# BASE DIR
-# -------------------------
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# -------------------------
-# SECRET + DEBUG
-# -------------------------
-SECRET_KEY = "dev-secret-key"  # Change in production!
+SECRET_KEY = "dev-secret-key"
 DEBUG = True
 ALLOWED_HOSTS = ["127.0.0.1", "localhost"]
 
-# -------------------------
-# INSTALLED APPS
-# -------------------------
 INSTALLED_APPS = [
     "django.contrib.admin",
     "django.contrib.auth",
@@ -28,12 +19,12 @@ INSTALLED_APPS = [
     "corsheaders",
     "rest_framework_simplejwt",
 
-    "api",
+    "channels",
+
+    # IMPORTANT: Use AppConfig so scheduler starts
+    "api.apps.ApiConfig",
 ]
 
-# -------------------------
-# MIDDLEWARE
-# -------------------------
 MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
@@ -45,19 +36,10 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
-# -------------------------
-# CORS (DEV ONLY)
-# -------------------------
 CORS_ALLOW_ALL_ORIGINS = True
 
-# -------------------------
-# ROOT URL
-# -------------------------
 ROOT_URLCONF = "backend.urls"
 
-# -------------------------
-# TEMPLATES
-# -------------------------
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
@@ -74,14 +56,12 @@ TEMPLATES = [
     },
 ]
 
-# -------------------------
-# WSGI
-# -------------------------
+# ASGI (Required for Channels)
+ASGI_APPLICATION = "backend.asgi.application"
+
+# Optional WSGI
 WSGI_APPLICATION = "backend.wsgi.application"
 
-# -------------------------
-# DATABASE
-# -------------------------
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.sqlite3",
@@ -89,29 +69,17 @@ DATABASES = {
     }
 }
 
-# -------------------------
-# AUTH
-# -------------------------
-AUTH_USER_MODEL = "api.User"  # Custom user with roles
+AUTH_USER_MODEL = "api.User"
 AUTH_PASSWORD_VALIDATORS = []
 
-# -------------------------
-# LANGUAGE / TIMEZONE
-# -------------------------
 LANGUAGE_CODE = "en-us"
 TIME_ZONE = "UTC"
 USE_I18N = True
 USE_TZ = True
 
-# -------------------------
-# STATIC
-# -------------------------
 STATIC_URL = "static/"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-# -------------------------
-# REST FRAMEWORK + JWT
-# -------------------------
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "rest_framework_simplejwt.authentication.JWTAuthentication",
@@ -124,8 +92,14 @@ REST_FRAMEWORK = {
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(hours=1),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
-    "ROTATE_REFRESH_TOKENS": True,           # Optional: rotate refresh tokens
-    "BLACKLIST_AFTER_ROTATION": True,        # Optional: blacklist used refresh tokens
-    "AUTH_HEADER_TYPES": ("Bearer",),
-    "AUTH_TOKEN_CLASSES": ("rest_framework_simplejwt.tokens.AccessToken",),
+}
+
+# Redis Channel Layer
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+            "hosts": [("127.0.0.1", 6379)],
+        },
+    },
 }

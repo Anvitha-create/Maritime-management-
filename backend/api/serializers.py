@@ -81,28 +81,37 @@ class VesselSerializer(serializers.ModelSerializer):
 
 
 # =========================
+# =========================
 # VOYAGE SERIALIZER
 # =========================
 class VoyageSerializer(serializers.ModelSerializer):
     vessel_name = serializers.CharField(source="vessel.name", read_only=True)
+
     origin_name = serializers.CharField(source="origin.name", read_only=True)
+    origin_lat = serializers.FloatField(source="origin.latitude", read_only=True)
+    origin_lng = serializers.FloatField(source="origin.longitude", read_only=True)
+
     destination_name = serializers.CharField(source="destination.name", read_only=True)
+    destination_lat = serializers.FloatField(source="destination.latitude", read_only=True)
+    destination_lng = serializers.FloatField(source="destination.longitude", read_only=True)
 
     class Meta:
         model = Voyage
         fields = [
             "id",
-            "vessel",
             "vessel_name",
-            "origin",
+
             "origin_name",
-            "destination",
+            "origin_lat",
+            "origin_lng",
+
             "destination_name",
+            "destination_lat",
+            "destination_lng",
+
             "departure_date",
             "arrival_date",
         ]
-
-
 # =========================
 # EVENT SERIALIZER
 # =========================

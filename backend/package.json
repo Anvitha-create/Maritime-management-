@@ -1,0 +1,5 @@
+{
+  "dependencies": {
+    "leaflet-polylinedecorator": "^1.6.0"
+  }
+}

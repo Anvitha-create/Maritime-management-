@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Live Vessel Tracking</title>
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet-polylinedecorator/dist/leaflet.polylineDecorator.js"></script>
+
+<style>
+body{
+    margin:0;
+    font-family:Arial;
+}
+
+h2{
+    text-align:center;
+    margin:10px;
+}
+
+#map{
+    height:90vh;
+    width:100%;
+}
+
+.vessel-label{
+    background:white;
+    font-weight:bold;
+    padding:3px 8px;
+    border-radius:6px;
+    font-size:12px;
+}
+</style>
+</head>
+
+<body>
+
+<h2>Live Vessel Tracking</h2>
+<div id="map"></div>
+
+<script>
+// ================= MAP INIT =================
+const map = L.map('map').setView([20.5937, 78.9629], 3);
+
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+    attribution:'© OpenStreetMap'
+}).addTo(map);
+
+// ================= STORAGE =================
+const vessels = {};
+const trails = {};
+const destMarkers = [];  // store destination labels to toggle
+
+// ================= VOYAGE ROUTES =================
+function loadVoyageRoutes() {
+    fetch("/api/voyages/", {
+        // headers: { "Authorization": "Bearer YOUR_TOKEN_HERE" },
+    })
+    .then(res => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+    })
+    .then(voyages => {
+        if (!Array.isArray(voyages)) return;
+
+        voyages.forEach(v => {
+            if (!v.origin_lat || !v.destination_lat) return;
+
+            const origin = [Number(v.origin_lat), Number(v.origin_lng)];
+            const destination = [Number(v.destination_lat), Number(v.destination_lng)];
+            const originName = v.origin_port_name || v.origin_name || "Origin";
+            const destName = v.destination_port_name || v.destination_name || "Destination";
+
+            // ---------- Origin Marker ----------
+            L.circleMarker(origin, {
+                radius: 7,
+                fillColor: "#0066FF",
+                color: "#ffffff",
+                weight: 1,
+                fillOpacity: 0.95
+            }).addTo(map)
+              .bindPopup(`<b>Origin Port</b><br>Name: ${originName}<br>Lat: ${origin[0].toFixed(4)}, Lng: ${origin[1].toFixed(4)}`);
+
+            // ---------- Dotted Route ----------
+            const route = L.polyline([origin, destination], {
+                color: "#0066FF",
+                weight: 2,
+                dashArray: "6,10",
+                opacity: 0.9
+            }).addTo(map);
+
+            // ---------- Big Filled Arrow at Destination ----------
+            const arrow = L.polylineDecorator(route, {
+                patterns: [{
+                    offset: "100%",
+                    repeat: 0,
+                    symbol: L.Symbol.arrowHead({
+                        pixelSize: 25,
+                        polygon: true,
+                        pathOptions: { 
+                            color: "#0066FF", 
+                            fillColor: "#0066FF", 
+                            fillOpacity: 0.8
+                        }
+                    })
+                }]
+            }).addTo(map);
+
+            // ---------- Destination Name (hidden initially) ----------
+            const destMarker = L.marker(destination, {
+                icon: L.divIcon({
+                    html: `<b>${destName}</b>`,
+                    className: "vessel-label",
+                    iconSize: [100, 24],
+                    iconAnchor: [50, -10] // above arrow
+                })
+            }).addTo(map);
+
+            destMarker.remove(); // hide initially
+            destMarkers.push(destMarker);
+
+            // ---------- Show destination when arrow clicked ----------
+            arrow.on('click', () => {
+                destMarkers.forEach(m => m.addTo(map)); // show all destination labels
+            });
+        });
+    })
+    .catch(err => {
+        console.error("Error fetching voyages:", err);
+        alert("Failed to load voyage routes. Check API authentication or server status.");
+    });
+}
+
+loadVoyageRoutes();
+
+// ================= WEBSOCKET LIVE TRACKING =================
+const socket = new WebSocket("ws://127.0.0.1:8000/ws/vessels/");
+
+socket.onopen = () => console.log("WebSocket connected");
+socket.onerror = e => console.error("WebSocket error:", e);
+socket.onclose = () => console.log("WebSocket closed");
+
+socket.onmessage = (event) => {
+    const data = JSON.parse(event.data);
+    const id = data.id;
+    const lat = Number(data.lat);
+    const lng = Number(data.lng);
+
+    if (!id || isNaN(lat) || isNaN(lng)) return;
+
+    const vesselName = data.name || data.vessel_name || "Unknown Vessel";
+
+    const popupContent = `<b>${vesselName}</b><br>
+        Type: ${data.vessel_type || ""}<br>
+        Status: ${data.status || ""}<br>
+        Port: ${data.current_port || "At Sea"}<br>
+        Lat: ${lat.toFixed(4)}, Lng: ${lng.toFixed(4)}`;
+
+    if (vessels[id]) {
+        vessels[id]
+            .setLatLng([lat, lng])
+            .setPopupContent(popupContent)
+            .setTooltipContent(vesselName);
+
+        trails[id].addLatLng([lat, lng]);
+    } else {
+        vessels[id] = L.marker([lat, lng])
+            .addTo(map)
+            .bindPopup(popupContent)
+            .bindTooltip(vesselName, {
+                permanent: true,
+                direction: "top",
+                className: "vessel-label"
+            });
+
+        trails[id] = L.polyline([[lat, lng]], {
+            color: "#00AAFF",
+            weight: 2
+        }).addTo(map);
+    }
+};
+</script>
+
+</body>
+</html>
